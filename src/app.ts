@@ -11,6 +11,7 @@ import { checkout, getOrder, orderView } from "./checkout.js";
 import { generateCoupon, listCoupons } from "./coupons.js";
 import { errorHandler, notFoundRoute } from "./errors.js";
 import { listProducts, updateProduct } from "./products.js";
+import { buildReport } from "./report.js";
 
 export const app = express();
 app.use(express.json());
@@ -70,6 +71,10 @@ app.post("/admin/coupons", (_req, res) => {
 
 app.get("/admin/coupons", (_req, res) => {
   res.json({ coupons: listCoupons() });
+});
+
+app.get("/admin/report", (_req, res) => {
+  res.json(buildReport());
 });
 
 app.use(notFoundRoute);

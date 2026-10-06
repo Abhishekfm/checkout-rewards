@@ -31,6 +31,7 @@ describe("checkout", () => {
     expect(statuses.filter((s) => s === 409)).toHaveLength(7);
     expect(results.filter((r) => r.status === 409).every((r) => r.body.error.code === "INSUFFICIENT_STOCK")).toBe(true);
     expect(await stockOf("p5")).toBe(0);
+    expect((await api("GET", "/admin/report")).body.totalOrders).toBe(3);
   });
 
   it("returns the same order when the same request is retried, even concurrently", async () => {
