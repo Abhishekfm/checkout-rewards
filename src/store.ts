@@ -16,8 +16,22 @@ export interface Cart {
   createdAt: string;
 }
 
+export interface Coupon {
+  code: string;
+  /** The order count that unlocked this coupon, e.g. 5, 10, 15 when n = 5. */
+  milestone: number;
+  percentOff: number;
+  /** reserved = held by a checkout whose payment is still running. */
+  status: "available" | "reserved" | "redeemed";
+  redeemedByOrderId: string | null;
+  createdAt: string;
+}
+
 export const products = new Map<string, Product>();
 export const carts = new Map<string, Cart>();
+/** Empty until checkout creates orders. Coupon generation only needs the count. */
+export const orders = new Map<string, { id: string }>();
+export const coupons = new Map<string, Coupon>();
 
 const seedProducts: readonly Product[] = [
   { id: "p1", name: "Classic T-Shirt", priceSubunits: 49900, stock: 100 },
@@ -31,6 +45,8 @@ const seedProducts: readonly Product[] = [
 export function resetStore(): void {
   products.clear();
   carts.clear();
+  orders.clear();
+  coupons.clear();
   for (const product of seedProducts) {
     products.set(product.id, { ...product });
   }
