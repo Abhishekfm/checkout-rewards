@@ -47,3 +47,9 @@ export async function api(
   });
   return { status: res.status, body: await res.json() };
 }
+
+let keyCounter = 0;
+export function checkout(cartId: string, opts: { key?: string; couponCode?: string } = {}) {
+  const key = opts.key ?? `key-${++keyCounter}`;
+  return api("POST", `/carts/${cartId}/checkout`, { couponCode: opts.couponCode }, { "Idempotency-Key": key });
+}

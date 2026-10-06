@@ -16,6 +16,27 @@ export interface Cart {
   createdAt: string;
 }
 
+/** Copy of what was bought, so the order still makes sense if the product changes later. */
+export interface OrderLine {
+  productId: string;
+  name: string;
+  unitPriceSubunits: number;
+  quantity: number;
+  lineTotalSubunits: number;
+}
+
+export interface Order {
+  id: string;
+  cartId: string;
+  lines: OrderLine[];
+  subtotalSubunits: number;
+  couponCode: string | null;
+  discountPercent: number;
+  discountSubunits: number;
+  totalSubunits: number;
+  createdAt: string;
+}
+
 export interface Coupon {
   code: string;
   /** The order count that unlocked this coupon, e.g. 5, 10, 15 when n = 5. */
@@ -27,11 +48,17 @@ export interface Coupon {
   createdAt: string;
 }
 
+export interface IdempotencyRecord {
+  fingerprint: string;
+  /** The order from this key. A promise so a retry can wait for the same result. */
+  result: Promise<Order>;
+}
+
 export const products = new Map<string, Product>();
 export const carts = new Map<string, Cart>();
-/** Empty until checkout creates orders. Coupon generation only needs the count. */
-export const orders = new Map<string, { id: string }>();
+export const orders = new Map<string, Order>();
 export const coupons = new Map<string, Coupon>();
+export const idempotencyKeys = new Map<string, IdempotencyRecord>();
 
 const seedProducts: readonly Product[] = [
   { id: "p1", name: "Classic T-Shirt", priceSubunits: 49900, stock: 100 },
@@ -47,6 +74,7 @@ export function resetStore(): void {
   carts.clear();
   orders.clear();
   coupons.clear();
+  idempotencyKeys.clear();
   for (const product of seedProducts) {
     products.set(product.id, { ...product });
   }

@@ -7,6 +7,7 @@ import {
   removeItem,
   setItemQuantity,
 } from "./cart.js";
+import { checkout, getOrder, orderView } from "./checkout.js";
 import { generateCoupon, listCoupons } from "./coupons.js";
 import { errorHandler, notFoundRoute } from "./errors.js";
 import { listProducts, updateProduct } from "./products.js";
@@ -48,6 +49,19 @@ app.patch("/carts/:cartId/items/:productId", (req, res) => {
 
 app.delete("/carts/:cartId/items/:productId", (req, res) => {
   res.json(cartView(removeItem(req.params.cartId, req.params.productId)));
+});
+
+app.post("/carts/:cartId/checkout", async (req, res) => {
+  const { created, order } = await checkout(
+    req.params.cartId,
+    req.get("Idempotency-Key"),
+    req.body?.couponCode
+  );
+  res.status(created ? 201 : 200).json(orderView(order));
+});
+
+app.get("/orders/:orderId", (req, res) => {
+  res.json(orderView(getOrder(req.params.orderId)));
 });
 
 app.post("/admin/coupons", (_req, res) => {

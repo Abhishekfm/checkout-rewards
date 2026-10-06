@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { api, cartWith, url, useServer } from "./helpers.js";
+import { api, cartWith, checkout, url, useServer } from "./helpers.js";
 
 useServer();
 
@@ -53,5 +53,13 @@ describe("cart", () => {
     });
     expect(bad.status).toBe(400);
     expect((await bad.json()).error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("can't be changed after checkout", async () => {
+    const cartId = await cartWith({ p1: 1 });
+    expect((await checkout(cartId)).status).toBe(201);
+    const res = await api("POST", `/carts/${cartId}/items`, { productId: "p2", quantity: 1 });
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe("CART_ALREADY_CHECKED_OUT");
   });
 });
