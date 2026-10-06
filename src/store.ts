@@ -50,7 +50,7 @@ export interface Coupon {
 
 export interface IdempotencyRecord {
   fingerprint: string;
-  /** The order from this key. A promise so a retry can wait for the same result. */
+  /** Pending while payment runs, so a retry that arrives mid-payment waits for the same result. */
   result: Promise<Order>;
 }
 

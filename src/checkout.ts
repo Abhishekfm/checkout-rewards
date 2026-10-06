@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { getCart } from "./cart.js";
 import { AppError } from "./errors.js";
 import { percentOf } from "./money.js";
+import { PaymentDeclinedError, getPaymentGateway } from "./payment.js";
 import {
   CURRENCY,
   coupons,
@@ -32,9 +33,13 @@ export function normalizeCouponCode(code: unknown): string | null {
 }
 
 /**
- * Synchronous checkout: check everything, then write.
- * There is no await before the order is saved, so two checkouts cannot
- * both pass the stock or coupon check for the same units.
+ * Checkout runs in three phases:
+ *
+ * 1. Reserve (synchronous): check everything, then take the stock, hold the coupon and
+ *    mark the cart as checking_out. There is no `await` before this phase finishes, so
+ *    no other request can run in the middle of it.
+ * 2. Pay (asynchronous): other requests run while we wait for the payment provider.
+ * 3. Confirm or release (synchronous): save the order, or give the stock and coupon back.
  */
 export async function checkout(
   cartId: string,
@@ -65,16 +70,25 @@ export async function checkout(
     return { created: false, order: await previous.result };
   }
 
-  const order = commitCheckout(cartId, couponCode);
-  idempotencyKeys.set(idempotencyKey, {
-    fingerprint,
-    result: Promise.resolve(order),
+  const reservation = reserve(cartId, couponCode);
+  const result = payAndConfirm(reservation);
+  // Save the promise before awaiting it, so a retry that arrives mid-payment waits for this same charge.
+  idempotencyKeys.set(idempotencyKey, { fingerprint, result });
+  result.catch(() => {
+    if (idempotencyKeys.get(idempotencyKey)?.result === result)
+      idempotencyKeys.delete(idempotencyKey);
   });
-  return { created: true, order };
+  return { created: true, order: await result };
 }
 
-/** Checks first. If any check fails, nothing has changed. */
-function commitCheckout(cartId: string, couponCode: string | null): Order {
+interface Reservation {
+  cart: Cart;
+  coupon: Coupon | undefined;
+  order: Order;
+}
+
+/** Phase 1. Synchronous: checks first, then writes. If any check fails, nothing has changed. */
+function reserve(cartId: string, couponCode: string | null): Reservation {
   const cart = getCart(cartId);
   if (cart.status === "checking_out") {
     throw new AppError(
@@ -114,37 +128,23 @@ function commitCheckout(cartId: string, couponCode: string | null): Order {
     );
   }
 
-  const coupon = takeCoupon(couponCode);
-  const order = buildOrder(cart, coupon);
-
-  for (const line of order.lines) {
-    products.get(line.productId)!.stock -= line.quantity;
-  }
-  if (coupon) {
-    coupon.status = "redeemed";
-    coupon.redeemedByOrderId = order.id;
-  }
-  orders.set(order.id, order);
-  cart.status = "checked_out";
-  cart.orderId = order.id;
-  return order;
-}
-
-function takeCoupon(couponCode: string | null): Coupon | undefined {
-  if (!couponCode) return undefined;
-  const coupon = coupons.get(couponCode);
-  if (!coupon)
+  const coupon = couponCode ? coupons.get(couponCode) : undefined;
+  if (couponCode && !coupon) {
     throw new AppError("COUPON_INVALID", `Coupon ${couponCode} does not exist`);
-  if (coupon.status !== "available") {
+  }
+  if (coupon?.status === "reserved") {
+    throw new AppError(
+      "COUPON_IN_USE",
+      `Coupon ${coupon.code} is being used by another checkout`
+    );
+  }
+  if (coupon?.status === "redeemed") {
     throw new AppError(
       "COUPON_ALREADY_REDEEMED",
       `Coupon ${coupon.code} has already been used`
     );
   }
-  return coupon;
-}
 
-function buildOrder(cart: Cart, coupon: Coupon | undefined): Order {
   const lines: OrderLine[] = Array.from(cart.items, ([productId, quantity]) => {
     const product = products.get(productId)!;
     return {
@@ -165,9 +165,9 @@ function buildOrder(cart: Cart, coupon: Coupon | undefined): Order {
     subtotalSubunits
   );
 
-  return {
+  const order: Order = {
     id: `ord_${randomUUID()}`,
-    cartId: cart.id,
+    cartId,
     lines,
     subtotalSubunits,
     couponCode: coupon?.code ?? null,
@@ -176,6 +176,51 @@ function buildOrder(cart: Cart, coupon: Coupon | undefined): Order {
     totalSubunits: subtotalSubunits - discountSubunits,
     createdAt: new Date().toISOString(),
   };
+
+  for (const line of lines) {
+    products.get(line.productId)!.stock -= line.quantity;
+  }
+  if (coupon) coupon.status = "reserved";
+  cart.status = "checking_out";
+
+  return { cart, coupon, order };
+}
+
+/** Phases 2 and 3. Confirm the order, or give the stock and coupon back. */
+async function payAndConfirm({
+  cart,
+  coupon,
+  order,
+}: Reservation): Promise<Order> {
+  try {
+    await getPaymentGateway().charge(order.totalSubunits, order.id);
+  } catch (err) {
+    for (const line of order.lines) {
+      products.get(line.productId)!.stock += line.quantity;
+    }
+    if (coupon) coupon.status = "available";
+    cart.status = "open";
+
+    if (err instanceof PaymentDeclinedError) {
+      throw new AppError(
+        "PAYMENT_DECLINED",
+        "Payment was declined; nothing was charged"
+      );
+    }
+    throw new AppError(
+      "PAYMENT_UNAVAILABLE",
+      "Payment provider failed; nothing was charged"
+    );
+  }
+
+  if (coupon) {
+    coupon.status = "redeemed";
+    coupon.redeemedByOrderId = order.id;
+  }
+  orders.set(order.id, order);
+  cart.status = "checked_out";
+  cart.orderId = order.id;
+  return order;
 }
 
 export function getOrder(orderId: string): Order {

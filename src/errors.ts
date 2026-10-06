@@ -4,6 +4,8 @@ import type { ErrorRequestHandler, RequestHandler } from "express";
 export const ERROR_STATUS = {
   VALIDATION_ERROR: 400,
 
+  PAYMENT_DECLINED: 402,
+
   NOT_FOUND: 404,
   CART_NOT_FOUND: 404,
   PRODUCT_NOT_FOUND: 404,
@@ -14,6 +16,7 @@ export const ERROR_STATUS = {
   CHECKOUT_IN_PROGRESS: 409,
   CART_EMPTY: 409,
   INSUFFICIENT_STOCK: 409,
+  COUPON_IN_USE: 409,
   COUPON_ALREADY_REDEEMED: 409,
   IDEMPOTENCY_KEY_REUSED: 409,
   NO_ELIGIBLE_MILESTONE: 409,
@@ -21,6 +24,7 @@ export const ERROR_STATUS = {
   COUPON_INVALID: 422,
 
   INTERNAL_ERROR: 500,
+  PAYMENT_UNAVAILABLE: 502,
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_STATUS;
@@ -44,33 +48,27 @@ export const notFoundRoute: RequestHandler = (req, _res, next) => {
 
 export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof AppError) {
-    res
-      .status(err.status)
-      .json({
-        error: { code: err.code, message: err.message, details: err.details },
-      });
+    res.status(err.status).json({
+      error: { code: err.code, message: err.message, details: err.details },
+    });
     return;
   }
   if (err?.type === "entity.parse.failed") {
-    res
-      .status(400)
-      .json({
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Body is not valid JSON",
-          details: {},
-        },
-      });
-    return;
-  }
-  console.error(err);
-  res
-    .status(500)
-    .json({
+    res.status(400).json({
       error: {
-        code: "INTERNAL_ERROR",
-        message: "Unexpected server error",
+        code: "VALIDATION_ERROR",
+        message: "Body is not valid JSON",
         details: {},
       },
     });
+    return;
+  }
+  console.error(err);
+  res.status(500).json({
+    error: {
+      code: "INTERNAL_ERROR",
+      message: "Unexpected server error",
+      details: {},
+    },
+  });
 };

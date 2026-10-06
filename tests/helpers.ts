@@ -2,6 +2,7 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, beforeEach } from "vitest";
 import { app } from "../src/app.js";
+import { fakeGateway, setPaymentGateway } from "../src/payment.js";
 import { resetStore } from "../src/store.js";
 
 let server: Server;
@@ -17,6 +18,7 @@ export function useServer(): void {
   afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
   beforeEach(() => {
     resetStore();
+    setPaymentGateway(fakeGateway);
   });
 }
 
@@ -28,8 +30,12 @@ export function url(path: string): string {
 export async function cartWith(items: Record<string, number>): Promise<string> {
   const { body: cart } = await api("POST", "/carts");
   for (const [productId, quantity] of Object.entries(items)) {
-    const res = await api("POST", `/carts/${cart.id}/items`, { productId, quantity });
-    if (res.status !== 200) throw new Error(`setup failed: ${JSON.stringify(res.body)}`);
+    const res = await api("POST", `/carts/${cart.id}/items`, {
+      productId,
+      quantity,
+    });
+    if (res.status !== 200)
+      throw new Error(`setup failed: ${JSON.stringify(res.body)}`);
   }
   return cart.id;
 }
@@ -49,7 +55,15 @@ export async function api(
 }
 
 let keyCounter = 0;
-export function checkout(cartId: string, opts: { key?: string; couponCode?: string } = {}) {
+export function checkout(
+  cartId: string,
+  opts: { key?: string; couponCode?: string } = {}
+) {
   const key = opts.key ?? `key-${++keyCounter}`;
-  return api("POST", `/carts/${cartId}/checkout`, { couponCode: opts.couponCode }, { "Idempotency-Key": key });
+  return api(
+    "POST",
+    `/carts/${cartId}/checkout`,
+    { couponCode: opts.couponCode },
+    { "Idempotency-Key": key }
+  );
 }
