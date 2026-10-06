@@ -1,9 +1,7 @@
-import express, { type ErrorRequestHandler } from "express";
-import {
-  listProducts,
-  ProductRequestError,
-  updateProduct,
-} from "./products.js";
+import express from "express";
+import { addItem, cartView, createCart, getCart, removeItem, setItemQuantity } from "./cart.js";
+import { errorHandler, notFoundRoute } from "./errors.js";
+import { listProducts, updateProduct } from "./products.js";
 
 export const app = express();
 app.use(express.json());
@@ -20,13 +18,27 @@ app.patch("/admin/products/:productId", (req, res) => {
   res.json(updateProduct(req.params.productId, req.body ?? {}));
 });
 
-const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
-  if (err instanceof ProductRequestError) {
-    res.status(err.status).json({ error: { message: err.message } });
-    return;
-  }
-  console.error(err);
-  res.status(500).json({ error: { message: "Unexpected server error" } });
-};
+app.post("/carts", (_req, res) => {
+  res.status(201).json(cartView(createCart()));
+});
 
+app.get("/carts/:cartId", (req, res) => {
+  res.json(cartView(getCart(req.params.cartId)));
+});
+
+app.post("/carts/:cartId/items", (req, res) => {
+  const { productId, quantity } = req.body ?? {};
+  res.json(cartView(addItem(req.params.cartId, productId, quantity)));
+});
+
+app.patch("/carts/:cartId/items/:productId", (req, res) => {
+  const { quantity } = req.body ?? {};
+  res.json(cartView(setItemQuantity(req.params.cartId, req.params.productId, quantity)));
+});
+
+app.delete("/carts/:cartId/items/:productId", (req, res) => {
+  res.json(cartView(removeItem(req.params.cartId, req.params.productId)));
+});
+
+app.use(notFoundRoute);
 app.use(errorHandler);

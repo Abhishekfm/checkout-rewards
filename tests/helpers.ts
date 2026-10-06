@@ -20,6 +20,20 @@ export function useServer(): void {
   });
 }
 
+export function url(path: string): string {
+  return baseUrl + path;
+}
+
+/** Builds an open cart with the given product quantities. */
+export async function cartWith(items: Record<string, number>): Promise<string> {
+  const { body: cart } = await api("POST", "/carts");
+  for (const [productId, quantity] of Object.entries(items)) {
+    const res = await api("POST", `/carts/${cart.id}/items`, { productId, quantity });
+    if (res.status !== 200) throw new Error(`setup failed: ${JSON.stringify(res.body)}`);
+  }
+  return cart.id;
+}
+
 export async function api(
   method: string,
   path: string,

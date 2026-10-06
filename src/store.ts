@@ -1,3 +1,5 @@
+export const CURRENCY = "INR";
+
 export interface Product {
   id: string;
   name: string;
@@ -5,7 +7,17 @@ export interface Product {
   stock: number;
 }
 
+export interface Cart {
+  id: string;
+  status: "open" | "checking_out" | "checked_out";
+  /** productId -> quantity. Prices are looked up live, never stored on the cart. */
+  items: Map<string, number>;
+  orderId?: string;
+  createdAt: string;
+}
+
 export const products = new Map<string, Product>();
+export const carts = new Map<string, Cart>();
 
 const seedProducts: readonly Product[] = [
   { id: "p1", name: "Classic T-Shirt", priceSubunits: 49900, stock: 100 },
@@ -15,9 +27,10 @@ const seedProducts: readonly Product[] = [
   { id: "p5", name: "Limited Edition Mug", priceSubunits: 34900, stock: 3 },
 ];
 
-/** Clears the product map and reloads copies of the seed products. */
+/** Clears stored data and reloads copies of the seed products. */
 export function resetStore(): void {
   products.clear();
+  carts.clear();
   for (const product of seedProducts) {
     products.set(product.id, { ...product });
   }
