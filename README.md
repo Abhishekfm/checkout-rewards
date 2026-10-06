@@ -17,12 +17,12 @@ npm test
 npm start          # same server, without reload on save
 ```
 
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `N` | 5 | Every Nth placed order unlocks one coupon. At least 1. |
-| `X` | 10 | Percent off on a new coupon. 1–99. |
-| `PORT` | 3000 | HTTP port. |
-| `PAYMENT_DELAY_MS` | 50 | Fake payment wait, then it approves. |
+| Variable           | Default | Meaning                                                |
+| ------------------ | ------- | ------------------------------------------------------ |
+| `N`                | 5       | Every Nth placed order unlocks one coupon. At least 1. |
+| `X`                | 10      | Percent off on a new coupon. 1–99.                     |
+| `PORT`             | 3000    | HTTP port.                                             |
+| `PAYMENT_DELAY_MS` | 50      | Fake payment wait, then it approves.                   |
 
 Data is gone on restart. Seed products are `p1`–`p5`. `p5` (Limited Edition Mug) has stock 3.
 
@@ -36,24 +36,22 @@ Amounts are whole paise (`INR`). `49900` is ₹499.00. Field names end in `Subun
 { "error": { "code": "INSUFFICIENT_STOCK", "message": "...", "details": {} } }
 ```
 
-Branch on `code`.
-
-| Status | Code | When |
-| --- | --- | --- |
-| 400 | `VALIDATION_ERROR` | Bad body, bad quantity, missing `Idempotency-Key`, or invalid JSON. |
-| 402 | `PAYMENT_DECLINED` | Declined. Stock and coupon are given back. |
-| 404 | `NOT_FOUND` | Unknown URL. |
-| 404 | `CART_NOT_FOUND`, `PRODUCT_NOT_FOUND`, `ITEM_NOT_IN_CART`, `ORDER_NOT_FOUND` | That id does not exist. |
-| 409 | `CART_EMPTY` | Empty cart. |
-| 409 | `CART_ALREADY_CHECKED_OUT` | `details.orderId` is the existing order. |
-| 409 | `CHECKOUT_IN_PROGRESS` | Payment for this cart is still running. |
-| 409 | `INSUFFICIENT_STOCK` | `details.items`: `{ productId, requested, available }`. |
-| 409 | `COUPON_IN_USE` | Held by another checkout. |
-| 409 | `COUPON_ALREADY_REDEEMED` | Already used. |
-| 409 | `IDEMPOTENCY_KEY_REUSED` | Same key, different cart or coupon. |
-| 409 | `NO_ELIGIBLE_MILESTONE` | None due. `details.nextMilestone`. |
-| 422 | `COUPON_INVALID` | Code does not exist. |
-| 502 | `PAYMENT_UNAVAILABLE` | Provider failed. Nothing charged. Safe to retry. |
+| Status | Code                                                                         | When                                                                |
+| ------ | ---------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| 400    | `VALIDATION_ERROR`                                                           | Bad body, bad quantity, missing `Idempotency-Key`, or invalid JSON. |
+| 402    | `PAYMENT_DECLINED`                                                           | Declined. Stock and coupon are given back.                          |
+| 404    | `NOT_FOUND`                                                                  | Unknown URL.                                                        |
+| 404    | `CART_NOT_FOUND`, `PRODUCT_NOT_FOUND`, `ITEM_NOT_IN_CART`, `ORDER_NOT_FOUND` | That id does not exist.                                             |
+| 409    | `CART_EMPTY`                                                                 | Empty cart.                                                         |
+| 409    | `CART_ALREADY_CHECKED_OUT`                                                   | `details.orderId` is the existing order.                            |
+| 409    | `CHECKOUT_IN_PROGRESS`                                                       | Payment for this cart is still running.                             |
+| 409    | `INSUFFICIENT_STOCK`                                                         | `details.items`: `{ productId, requested, available }`.             |
+| 409    | `COUPON_IN_USE`                                                              | Held by another checkout.                                           |
+| 409    | `COUPON_ALREADY_REDEEMED`                                                    | Already used.                                                       |
+| 409    | `IDEMPOTENCY_KEY_REUSED`                                                     | Same key, different cart or coupon.                                 |
+| 409    | `NO_ELIGIBLE_MILESTONE`                                                      | None due. `details.nextMilestone`.                                  |
+| 422    | `COUPON_INVALID`                                                             | Code does not exist.                                                |
+| 502    | `PAYMENT_UNAVAILABLE`                                                        | Provider failed. Nothing charged. Safe to retry.                    |
 
 ---
 
@@ -71,9 +69,20 @@ Branch on `code`.
 
 ```json
 {
-  "id": "cart_...", "status": "open", "orderId": null, "currency": "INR",
-  "items": [{ "productId": "p1", "name": "Classic T-Shirt", "unitPriceSubunits": 49900,
-              "quantity": 2, "lineTotalSubunits": 99800, "available": true }],
+  "id": "cart_...",
+  "status": "open",
+  "orderId": null,
+  "currency": "INR",
+  "items": [
+    {
+      "productId": "p1",
+      "name": "Classic T-Shirt",
+      "unitPriceSubunits": 49900,
+      "quantity": 2,
+      "lineTotalSubunits": 99800,
+      "available": true
+    }
+  ],
   "subtotalSubunits": 99800
 }
 ```
@@ -106,11 +115,24 @@ Takes the stock, holds the coupon, then a fake payment approves. No card is sent
 
 ```json
 {
-  "id": "ord_...", "cartId": "cart_...", "currency": "INR",
-  "lines": [{ "productId": "p1", "name": "Classic T-Shirt", "unitPriceSubunits": 49900,
-              "quantity": 1, "lineTotalSubunits": 49900 }],
-  "subtotalSubunits": 49900, "couponCode": null, "discountPercent": 0,
-  "discountSubunits": 0, "totalSubunits": 49900, "createdAt": "..."
+  "id": "ord_...",
+  "cartId": "cart_...",
+  "currency": "INR",
+  "lines": [
+    {
+      "productId": "p1",
+      "name": "Classic T-Shirt",
+      "unitPriceSubunits": 49900,
+      "quantity": 1,
+      "lineTotalSubunits": 49900
+    }
+  ],
+  "subtotalSubunits": 49900,
+  "couponCode": null,
+  "discountPercent": 0,
+  "discountSubunits": 0,
+  "totalSubunits": 49900,
+  "createdAt": "..."
 }
 ```
 
@@ -132,9 +154,14 @@ One coupon per milestone (`N`, `2N`, `3N`, …), lowest missing first. 0 orders 
 
 ```json
 {
-  "currency": "INR", "totalOrders": 1,
-  "quantityByProduct": [{ "productId": "p4", "name": "Notebook Pack", "quantity": 1 }],
-  "grossRevenueSubunits": 24950, "discountsSubunits": 0, "netRevenueSubunits": 24950,
+  "currency": "INR",
+  "totalOrders": 1,
+  "quantityByProduct": [
+    { "productId": "p4", "name": "Notebook Pack", "quantity": 1 }
+  ],
+  "grossRevenueSubunits": 24950,
+  "discountsSubunits": 0,
+  "netRevenueSubunits": 24950,
   "coupons": { "generated": 0, "available": 0, "redeemed": 0, "reserved": 0 }
 }
 ```
